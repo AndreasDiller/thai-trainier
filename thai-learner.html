@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Thai ABCs">
+<title>Thai Buchstaben Learner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-border: #2a2d3a;
+    --text: #e8e6e3;
+    --text-dim: #8a8d9a;
+    --accent: #f0c040;
+    --accent-glow: rgba(240, 192, 64, 0.15);
+    --correct: #34d399;
+    --correct-bg: rgba(52, 211, 153, 0.12);
+    --wrong: #f87171;
+    --wrong-bg: rgba(248, 113, 113, 0.1);
+    --btn-bg: #22253a;
+    --btn-border: #33364a;
+    --vowel-accent: #38bdf8;
+    --vowel-glow: rgba(56, 189, 248, 0.12);
+    --radius: 14px;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
+    padding-top: max(env(safe-area-inset-top), 12px);
+    min-height: 100dvh;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* --- Mode toggle --- */
+  .mode-toggle {
+    display: flex;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 3px;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .mode-btn.active-con {
+    background: rgba(240, 192, 64, 0.15);
+    color: var(--accent);
+  }
+  .mode-btn.active-vow {
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--vowel-accent);
+  }
+  .mode-btn.active-all {
+    background: rgba(167, 139, 250, 0.12);
+    color: #a78bfa;
+  }
+
+  /* --- Stats bar --- */
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 4px 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .stats .score { color: var(--accent); }
+  .stats .streak { color: var(--correct); }
+
+  /* --- Thai character display --- */
+  .char-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    width: 100%;
+    aspect-ratio: 5 / 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .char-card::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -30%;
+    width: 160%;
+    height: 160%;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+    pointer-events: none;
+    transition: background 0.3s;
+  }
+  .char-card.vowel-mode::before {
+    background: radial-gradient(circle, var(--vowel-glow) 0%, transparent 65%);
+  }
+
+  .thai-char {
+    font-family: 'Sarabun', sans-serif;
+    font-size: clamp(80px, 22vw, 140px);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text);
+    position: relative;
+    z-index: 1;
+    transition: transform 0.3s ease;
+    text-align: center;
+  }
+
+  /* Placeholder styling for อ in vowels */
+  .thai-char .ph {
+    display: inline-block;
+    position: relative;
+    color: var(--text-dim);
+    opacity: 0.3;
+  }
+  .thai-char .ph::before {
+    content: '';
+    position: absolute;
+    inset: 12% 2% 8% 2%;
+    border: 2.5px dashed var(--vowel-accent);
+    border-radius: 10px;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .char-card .type-badge {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 8px;
+    z-index: 2;
+  }
+  .type-badge.consonant { background: rgba(240, 192, 64, 0.15); color: var(--accent); }
+  .type-badge.vowel { background: rgba(56, 189, 248, 0.12); color: var(--vowel-accent); }
+
+  .char-card .class-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 8px;
+    z-index: 2;
+  }
+  .class-badge.mid { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+  .class-badge.high { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
+  .class-badge.low { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+  .class-badge.short { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+  .class-badge.long { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+
+  .char-card .sound-hint {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    z-index: 1;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .char-card.revealed .sound-hint { opacity: 1; }
+
+  /* --- Answer buttons --- */
+  .answers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .ans-btn {
+    background: var(--btn-bg);
+    border: 1.5px solid var(--btn-border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 14px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    line-height: 1.3;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .ans-btn:active:not(.locked) {
+    transform: scale(0.97);
+  }
+
+  .ans-btn.correct {
+    background: var(--correct-bg);
+    border-color: var(--correct);
+    color: var(--correct);
+  }
+
+  .ans-btn.wrong {
+    background: var(--wrong-bg);
+    border-color: var(--wrong);
+    color: var(--wrong);
+    opacity: 0.5;
+  }
+
+  .ans-btn.locked {
+    pointer-events: none;
+  }
+
+  /* --- Next button --- */
+  .next-btn {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.25s ease;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .next-btn.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .next-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* --- Placeholder legend --- */
+  .placeholder-legend {
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.55;
+    margin-top: 0;
+    margin-bottom: 2px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+  }
+  .legend-dash {
+    display: inline-block;
+    width: 18px;
+    height: 14px;
+    border: 1.5px dashed var(--vowel-accent);
+    border-radius: 4px;
+    opacity: 0.5;
+    vertical-align: middle;
+  }
+
+  /* --- Animations --- */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
+  .shake { animation: shake 0.35s ease; }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  .pop { animation: pop 0.3s ease; }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 80%, rgba(240,192,64,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(56,189,248,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <div class="mode-toggle">
+    <button class="mode-btn active-con" id="mode-con" onclick="setMode('consonants')">พยัญชนะ</button>
+    <button class="mode-btn" id="mode-vow" onclick="setMode('vowels')">สระ</button>
+    <button class="mode-btn" id="mode-all" onclick="setMode('all')">Alles</button>
+  </div>
+
+  <div class="stats">
+    <span>Runde <span id="round">1</span></span>
+    <span class="score">✓ <span id="correct-count">0</span></span>
+    <span class="streak">🔥 <span id="streak">0</span></span>
+  </div>
+
+  <div class="char-card" id="char-card">
+    <div class="type-badge" id="type-badge"></div>
+    <div class="class-badge" id="class-badge"></div>
+    <div class="thai-char" id="thai-char"></div>
+    <div class="sound-hint" id="sound-hint"></div>
+  </div>
+
+  <div id="placeholder-legend" class="placeholder-legend" style="display:none;">
+    <span class="legend-dash"></span> อ = Platzhalter für Konsonant
+  </div>
+
+  <div class="answers" id="answers"></div>
+
+  <button class="next-btn" id="next-btn" onclick="nextRound()">Weiter →</button>
+</div>
+
+<script>
+// ========== 44 Thai Consonants ==========
+const consonants = [
+  { char: "ก", romanName: "gor gài", sound: "g/k", cls: "mid" },
+  { char: "ข", romanName: "khǒr khài", sound: "kh/k", cls: "high" },
+  { char: "ฃ", romanName: "khǒr khùat", sound: "kh/k", cls: "high" },
+  { char: "ค", romanName: "khor khwaai", sound: "kh/k", cls: "low" },
+  { char: "ฅ", romanName: "khor khon", sound: "kh/k", cls: "low" },
+  { char: "ฆ", romanName: "khor rá-khang", sound: "kh/k", cls: "low" },
+  { char: "ง", romanName: "ngor nguu", sound: "ng/ng", cls: "low" },
+  { char: "จ", romanName: "jor jaan", sound: "j/t", cls: "mid" },
+  { char: "ฉ", romanName: "chǒr chìng", sound: "ch/–", cls: "high" },
+  { char: "ช", romanName: "chor cháang", sound: "ch/t", cls: "low" },
+  { char: "ซ", romanName: "sor sôo", sound: "s/t", cls: "low" },
+  { char: "ฌ", romanName: "chor chəə", sound: "ch/–", cls: "low" },
+  { char: "ญ", romanName: "yor yǐng", sound: "y/n", cls: "low" },
+  { char: "ฎ", romanName: "dor cha-daa", sound: "d/t", cls: "mid" },
+  { char: "ฏ", romanName: "dtor bpà-dtàk", sound: "t/t", cls: "mid" },
+  { char: "ฐ", romanName: "thǒr thǎan", sound: "th/t", cls: "high" },
+  { char: "ฑ", romanName: "thor mon-too", sound: "th/t", cls: "low" },
+  { char: "ฒ", romanName: "thor phûu-thâo", sound: "th/t", cls: "low" },
+  { char: "ณ", romanName: "nor neen", sound: "n/n", cls: "low" },
+  { char: "ด", romanName: "dor dèk", sound: "d/t", cls: "mid" },
+  { char: "ต", romanName: "dtor dtào", sound: "t/t", cls: "mid" },
+  { char: "ถ", romanName: "thǒr thǔng", sound: "th/t", cls: "high" },
+  { char: "ท", romanName: "thor thá-hǎan", sound: "th/t", cls: "low" },
+  { char: "ธ", romanName: "thor thong", sound: "th/t", cls: "low" },
+  { char: "น", romanName: "nor nǔu", sound: "n/n", cls: "low" },
+  { char: "บ", romanName: "bor bai-máai", sound: "b/p", cls: "mid" },
+  { char: "ป", romanName: "bpor bplaa", sound: "bp/p", cls: "mid" },
+  { char: "ผ", romanName: "phǒr phûeng", sound: "ph/–", cls: "high" },
+  { char: "ฝ", romanName: "fǒr fǎa", sound: "f/–", cls: "high" },
+  { char: "พ", romanName: "phor phaan", sound: "ph/p", cls: "low" },
+  { char: "ฟ", romanName: "for fan", sound: "f/p", cls: "low" },
+  { char: "ภ", romanName: "phor sǎm-phao", sound: "ph/p", cls: "low" },
+  { char: "ม", romanName: "mor máa", sound: "m/m", cls: "low" },
+  { char: "ย", romanName: "yor yák", sound: "y/y", cls: "low" },
+  { char: "ร", romanName: "ror ruua", sound: "r/n", cls: "low" },
+  { char: "ล", romanName: "lor ling", sound: "l/n", cls: "low" },
+  { char: "ว", romanName: "wor wǎen", sound: "w/w", cls: "low" },
+  { char: "ศ", romanName: "sǒr sǎa-laa", sound: "s/t", cls: "high" },
+  { char: "ษ", romanName: "sǒr ruu-sǐi", sound: "s/t", cls: "high" },
+  { char: "ส", romanName: "sǒr sǔua", sound: "s/t", cls: "high" },
+  { char: "ห", romanName: "hǒr hìip", sound: "h/–", cls: "high" },
+  { char: "ฬ", romanName: "lor jù-laa", sound: "l/n", cls: "low" },
+  { char: "อ", romanName: "or àang", sound: "ʔ/–", cls: "mid" },
+  { char: "ฮ", romanName: "hor nók-hûuk", sound: "h/–", cls: "low" },
+];
+
+// ========== Thai Vowels ==========
+const PH = "อ";
+
+const vowels = [
+  { display: "อะ",    romanName: "sara à",             sound: "/a/",   len: "short" },
+  { display: "อา",    romanName: "sara aa",            sound: "/aː/",  len: "long" },
+  { display: "อิ",     romanName: "sara ì",             sound: "/i/",   len: "short" },
+  { display: "อี",     romanName: "sara ii",            sound: "/iː/",  len: "long" },
+  { display: "อึ",     romanName: "sara ùe",            sound: "/ɯ/",   len: "short" },
+  { display: "อื",     romanName: "sara uue",           sound: "/ɯː/",  len: "long" },
+  { display: "อุ",     romanName: "sara ù",             sound: "/u/",   len: "short" },
+  { display: "อู",     romanName: "sara uu",            sound: "/uː/",  len: "long" },
+  { display: "เอะ",   romanName: "sara è",             sound: "/e/",   len: "short" },
+  { display: "เอ",    romanName: "sara ee",            sound: "/eː/",  len: "long" },
+  { display: "แอะ",   romanName: "sara àe",            sound: "/ɛ/",   len: "short" },
+  { display: "แอ",    romanName: "sara aae",           sound: "/ɛː/",  len: "long" },
+  { display: "โอะ",   romanName: "sara ò",             sound: "/o/",   len: "short" },
+  { display: "โอ",    romanName: "sara oo",            sound: "/oː/",  len: "long" },
+  { display: "เออะ",  romanName: "sara ə̀",            sound: "/ə/",   len: "short" },
+  { display: "เออ",   romanName: "sara əə",            sound: "/əː/",  len: "long" },
+  { display: "เอาะ",  romanName: "sara ɔ̀",            sound: "/ɔ/",   len: "short" },
+  { display: "ออ",    romanName: "sara ɔɔ",            sound: "/ɔː/",  len: "long" },
+  { display: "เอียะ",  romanName: "sara ìa",           sound: "/ia/",  len: "short" },
+  { display: "เอีย",   romanName: "sara iia",          sound: "/iːa/", len: "long" },
+  { display: "เอือะ",  romanName: "sara ùea",          sound: "/ɯa/",  len: "short" },
+  { display: "เอือ",   romanName: "sara uuea",         sound: "/ɯːa/", len: "long" },
+  { display: "อัวะ",   romanName: "sara ùa",           sound: "/ua/",  len: "short" },
+  { display: "อัว",    romanName: "sara uua",          sound: "/uːa/", len: "long" },
+  { display: "อำ",    romanName: "sara am",            sound: "/am/",  len: "short" },
+  { display: "ใอ",    romanName: "sara ai mái múan",   sound: "/ai/",  len: "long" },
+  { display: "ไอ",    romanName: "sara ai mái malaai", sound: "/ai/",  len: "long" },
+  { display: "เอา",   romanName: "sara ao",            sound: "/ao/",  len: "long" },
+  { display: "ฤ",     romanName: "rúe",                sound: "/rɯ/",  len: "short", noPh: true },
+  { display: "ฤๅ",    romanName: "ruu",                sound: "/rɯː/", len: "long",  noPh: true },
+  { display: "ฦ",     romanName: "lúe",                sound: "/lɯ/",  len: "short", noPh: true },
+  { display: "ฦๅ",    romanName: "luu",                sound: "/lɯː/", len: "long",  noPh: true },
+];
+
+// ========== State ==========
+let mode = 'consonants';
+let round = 0, correctTotal = 0, streak = 0;
+let currentItemType = null, currentCorrectIdx = null, answered = false;
+let pool = [], poolIdx = 0;
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildPool() {
+  pool = [];
+  if (mode === 'consonants' || mode === 'all')
+    consonants.forEach((_, i) => pool.push({ t: 'c', i }));
+  if (mode === 'vowels' || mode === 'all')
+    vowels.forEach((_, i) => pool.push({ t: 'v', i }));
+  shuffle(pool);
+  poolIdx = 0;
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-con').className = 'mode-btn' + (m === 'consonants' ? ' active-con' : '');
+  document.getElementById('mode-vow').className = 'mode-btn' + (m === 'vowels' ? ' active-vow' : '');
+  document.getElementById('mode-all').className = 'mode-btn' + (m === 'all' ? ' active-all' : '');
+  round = 0; correctTotal = 0; streak = 0;
+  document.getElementById('correct-count').textContent = '0';
+  document.getElementById('streak').textContent = '0';
+  buildPool();
+  startRound();
+}
+
+function pickDistractors(type, correctIdx, count) {
+  const src = type === 'c' ? consonants : vowels;
+  const out = [];
+  while (out.length < count) {
+    const r = Math.floor(Math.random() * src.length);
+    if (r !== correctIdx && !out.includes(r)) out.push(r);
+  }
+  return out;
+}
+
+function renderVowelDisplay(str, noPh) {
+  if (noPh) return str;
+  let html = '';
+  for (const ch of str) {
+    html += (ch === PH) ? `<span class="ph">${PH}</span>` : ch;
+  }
+  return html;
+}
+
+function startRound() {
+  answered = false;
+  round++;
+  if (poolIdx >= pool.length) buildPool();
+  const pick = pool[poolIdx++];
+  currentItemType = pick.t;
+  currentCorrectIdx = pick.i;
+
+  const card = document.getElementById('char-card');
+  const charEl = document.getElementById('thai-char');
+  const typeBadge = document.getElementById('type-badge');
+  const classBadge = document.getElementById('class-badge');
+  const soundHint = document.getElementById('sound-hint');
+  const legend = document.getElementById('placeholder-legend');
+
+  document.getElementById('round').textContent = round;
+  card.classList.remove('revealed');
+
+  if (pick.t === 'c') {
+    const c = consonants[pick.i];
+    card.classList.remove('vowel-mode');
+    charEl.innerHTML = c.char;
+    typeBadge.textContent = 'พยัญชนะ';
+    typeBadge.className = 'type-badge consonant';
+    classBadge.textContent = c.cls;
+    classBadge.className = 'class-badge ' + c.cls;
+    soundHint.textContent = `Laut: ${c.sound}`;
+    legend.style.display = 'none';
+  } else {
+    const v = vowels[pick.i];
+    card.classList.add('vowel-mode');
+    charEl.innerHTML = renderVowelDisplay(v.display, v.noPh);
+    typeBadge.textContent = 'สระ';
+    typeBadge.className = 'type-badge vowel';
+    classBadge.textContent = v.len === 'short' ? 'kurz' : 'lang';
+    classBadge.className = 'class-badge ' + v.len;
+    soundHint.textContent = `Laut: ${v.sound}`;
+    legend.style.display = v.noPh ? 'none' : 'flex';
+  }
+
+  const distractors = pickDistractors(pick.t, pick.i, 5);
+  const options = shuffle([pick.i, ...distractors]);
+  const src = pick.t === 'c' ? consonants : vowels;
+
+  const answersEl = document.getElementById('answers');
+  answersEl.innerHTML = '';
+  options.forEach(idx => {
+    const btn = document.createElement('button');
+    btn.className = 'ans-btn';
+    btn.textContent = src[idx].romanName;
+    btn.onclick = () => handleAnswer(btn, idx);
+    answersEl.appendChild(btn);
+  });
+
+  document.getElementById('next-btn').classList.remove('show');
+  charEl.classList.remove('pop');
+  void charEl.offsetWidth;
+  charEl.classList.add('pop');
+}
+
+function handleAnswer(btn, idx) {
+  if (btn.classList.contains('locked')) return;
+  if (idx === currentCorrectIdx) {
+    btn.classList.add('correct', 'locked');
+    document.querySelectorAll('.ans-btn').forEach(b => b.classList.add('locked'));
+    document.getElementById('char-card').classList.add('revealed');
+    if (!answered) { correctTotal++; streak++; }
+    answered = true;
+    document.getElementById('correct-count').textContent = correctTotal;
+    document.getElementById('streak').textContent = streak;
+    document.getElementById('next-btn').classList.add('show');
+  } else {
+    btn.classList.add('wrong', 'locked');
+    if (!answered) { streak = 0; document.getElementById('streak').textContent = streak; }
+    answered = true;
+    const el = document.getElementById('thai-char');
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
+  }
+}
+
+function nextRound() { startRound(); }
+
+buildPool();
+startRound();
+</script>
+
+</body>
+</html>

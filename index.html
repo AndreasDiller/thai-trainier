@@ -213,6 +213,17 @@
   }
   .char-card.revealed .sound-hint { opacity: 1; }
 
+  /* --- Prompt label (e.g. "Welche Tonklasse?") --- */
+  .prompt-label {
+    width: 100%;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    display: none;
+  }
+
   /* --- Answer buttons --- */
   .answers {
     display: grid;
@@ -236,6 +247,10 @@
     line-height: 1.3;
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  .ans-btn.class-opt {
+    grid-column: span 2;
   }
 
   .ans-btn:active:not(.locked) {
@@ -363,6 +378,8 @@
     <span class="legend-dash"></span> อ = Platzhalter für Konsonant
   </div>
 
+  <div class="prompt-label" id="prompt-label"></div>
+
   <div class="answers" id="answers"></div>
 
   <button class="next-btn" id="next-btn" onclick="nextRound()">Weiter →</button>
@@ -455,10 +472,17 @@ const vowels = [
   { display: "ฦๅ",    romanName: "luu",                sound: "/lɯː/", len: "long",  noPh: true },
 ];
 
+const CLASS_OPTIONS = [
+  { key: "mid",  label: "Mittelklasse (mid)" },
+  { key: "high", label: "Hochklasse (high)" },
+  { key: "low",  label: "Tiefklasse (low)" },
+];
+
 // ========== State ==========
 let mode = 'consonants';
 let round = 0, correctTotal = 0, streak = 0;
 let currentItemType = null, currentCorrectIdx = null, answered = false;
+let currentConsonantClass = null;
 let pool = [], poolIdx = 0;
 
 function shuffle(a) {
@@ -517,6 +541,7 @@ function startRound() {
   const pick = pool[poolIdx++];
   currentItemType = pick.t;
   currentCorrectIdx = pick.i;
+  currentConsonantClass = null;
 
   const card = document.getElementById('char-card');
   const charEl = document.getElementById('thai-char');
@@ -524,18 +549,21 @@ function startRound() {
   const classBadge = document.getElementById('class-badge');
   const soundHint = document.getElementById('sound-hint');
   const legend = document.getElementById('placeholder-legend');
+  const promptLabel = document.getElementById('prompt-label');
 
   document.getElementById('round').textContent = round;
   card.classList.remove('revealed');
+  promptLabel.style.display = 'none';
+  classBadge.style.display = 'none';
 
   if (pick.t === 'c') {
     const c = consonants[pick.i];
+    currentConsonantClass = c.cls;
     card.classList.remove('vowel-mode');
     charEl.innerHTML = c.char;
     typeBadge.textContent = 'พยัญชนะ';
     typeBadge.className = 'type-badge consonant';
-    classBadge.textContent = c.cls;
-    classBadge.className = 'class-badge ' + c.cls;
+    // Klasse wird bewusst NICHT angezeigt - das ist die zweite Frage
     soundHint.textContent = `Laut: ${c.sound}`;
     legend.style.display = 'none';
   } else {
@@ -546,6 +574,7 @@ function startRound() {
     typeBadge.className = 'type-badge vowel';
     classBadge.textContent = v.len === 'short' ? 'kurz' : 'lang';
     classBadge.className = 'class-badge ' + v.len;
+    classBadge.style.display = '';
     soundHint.textContent = `Laut: ${v.sound}`;
     legend.style.display = v.noPh ? 'none' : 'flex';
   }
@@ -570,25 +599,73 @@ function startRound() {
   charEl.classList.add('pop');
 }
 
+function shakeChar() {
+  const el = document.getElementById('thai-char');
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+}
+
 function handleAnswer(btn, idx) {
   if (btn.classList.contains('locked')) return;
   if (idx === currentCorrectIdx) {
     btn.classList.add('correct', 'locked');
     document.querySelectorAll('.ans-btn').forEach(b => b.classList.add('locked'));
-    document.getElementById('char-card').classList.add('revealed');
     if (!answered) { correctTotal++; streak++; }
     answered = true;
     document.getElementById('correct-count').textContent = correctTotal;
     document.getElementById('streak').textContent = streak;
-    document.getElementById('next-btn').classList.add('show');
+
+    if (currentItemType === 'c') {
+      // Buchstabe erkannt -> jetzt die Tonklasse abfragen
+      setTimeout(() => showClassQuestion(currentConsonantClass), 450);
+    } else {
+      document.getElementById('char-card').classList.add('revealed');
+      document.getElementById('next-btn').classList.add('show');
+    }
   } else {
     btn.classList.add('wrong', 'locked');
     if (!answered) { streak = 0; document.getElementById('streak').textContent = streak; }
     answered = true;
-    const el = document.getElementById('thai-char');
-    el.classList.remove('shake');
-    void el.offsetWidth;
-    el.classList.add('shake');
+    shakeChar();
+  }
+}
+
+function showClassQuestion(correctCls) {
+  const promptLabel = document.getElementById('prompt-label');
+  promptLabel.textContent = 'Welche Tonklasse hat dieser Konsonant?';
+  promptLabel.style.display = 'block';
+
+  const shuffled = shuffle(CLASS_OPTIONS.slice());
+  const answersEl = document.getElementById('answers');
+  answersEl.innerHTML = '';
+  shuffled.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'ans-btn class-opt';
+    btn.textContent = opt.label;
+    btn.onclick = () => handleClassAnswer(btn, opt.key, correctCls);
+    answersEl.appendChild(btn);
+  });
+}
+
+function handleClassAnswer(btn, cls, correctCls) {
+  if (btn.classList.contains('locked')) return;
+  if (cls === correctCls) {
+    btn.classList.add('correct', 'locked');
+    document.querySelectorAll('.ans-btn').forEach(b => b.classList.add('locked'));
+
+    const classBadge = document.getElementById('class-badge');
+    classBadge.textContent = correctCls;
+    classBadge.className = 'class-badge ' + correctCls;
+    classBadge.style.display = '';
+
+    document.getElementById('char-card').classList.add('revealed');
+    document.getElementById('next-btn').classList.add('show');
+  } else {
+    btn.classList.add('wrong', 'locked');
+    streak = 0;
+    document.getElementById('streak').textContent = streak;
+    shakeChar();
   }
 }
 
